@@ -1,10 +1,10 @@
-import { protos } from "@aptos-labs/aptos-processor-sdk";
+import { protos } from "./sdk";
 import { Event } from "./models";
 import {
   ProcessingResult,
   TransactionsProcessor,
   grpcTimestampToDate,
-} from "@aptos-labs/aptos-processor-sdk";
+} from "./sdk";
 import { DataSource } from "typeorm";
 
 export class EventProcessor extends TransactionsProcessor {
@@ -44,6 +44,7 @@ export class EventProcessor extends TransactionsProcessor {
 
       const events = userTransaction.events!;
 
+      // parse events
       const objects = events.map((event, i) => {
         const eventEntity = new Event();
         eventEntity.transactionVersion = transactionVersion.toString();

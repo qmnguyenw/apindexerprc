@@ -1,4 +1,4 @@
-import { Base } from "@aptos-labs/aptos-processor-sdk";
+import { Base } from "./sdk";
 import { Column, Entity, PrimaryColumn } from "typeorm";
 
 @Entity("events")

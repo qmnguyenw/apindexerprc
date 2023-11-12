@@ -1,5 +1,5 @@
 import { program } from "commander";
-import { Config, Worker } from "@aptos-labs/aptos-processor-sdk";
+import { Config, Worker } from "./sdk";
 import { EventProcessor } from "./processor";
 import { Event } from "./models";
 

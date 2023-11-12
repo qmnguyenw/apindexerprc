@@ -8,7 +8,7 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "build": "./scripts/build.sh",
+    "build": "bash scripts/build.sh",
     "orm": "npx typeorm -d ./migration.ts",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "fmt": "prettier --write 'src/**/*.(ts|tsx)'"

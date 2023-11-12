@@ -120,6 +120,7 @@ export class Worker {
     stream.on(
       "data",
       async (response: aptos.indexer.v1.TransactionsResponse) => {
+        console.log("hi");
         stream.pause();
         const transactions = response.transactions;
 
@@ -206,8 +207,11 @@ export class Worker {
     );
 
     stream.on("error", function (e) {
-      console.error("Hello " + e);
-      stream.resume();
+      console.error(e + startingVersion.toString());
+      if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
+        console.log("Hello World!");
+        redo();
+      }
       // An error has occurred and the stream has been closed.
     });
 
@@ -216,4 +220,60 @@ export class Worker {
       // process status
     });
   }
+}
+
+function redo() {
+  const client = new aptos.indexer.v1.RawDataClient(
+    "grpc.testnet.aptoslabs.com:443",
+    ChannelCredentials.createSsl(),
+    {
+      "grpc.keepalive_time_ms": 1000,
+      // 0 - No compression
+      // 1 - Compress with DEFLATE algorithm
+      // 2 - Compress with GZIP algorithm
+      // 3 - Stream compression with GZIP algorithm
+      "grpc.default_compression_algorithm": 2,
+      // 0 - No compression
+      // 1 - Low compression level
+      // 2 - Medium compression level
+      // 3 - High compression level
+      "grpc.default_compression_level": 3,
+      // -1 means unlimited
+      "grpc.max_receive_message_length": -1,
+      // -1 means unlimited
+      "grpc.max_send_message_length": -1,
+    },
+  );
+  const startingVersion = BigInt(0n);
+  const request: aptos.indexer.v1.GetTransactionsRequest = {
+    startingVersion,
+  };
+
+  const metadata = new Metadata();
+  metadata.set(
+    "Authorization",
+    "Bearer EWnPN5ZMFJoaAWAgirCTMteoNNH2lZoznjGM9P3VYhmLHoAUxF4A83rIfqmTpAIQ",
+  );
+
+  // Create and start the streaming RPC.
+  const stream = client.getTransactions(request, metadata);
+  stream.on(
+    "data",
+    async (response: aptos.indexer.v1.TransactionsResponse) => {
+      console.log("hi");
+      console.log(response);
+    }
+  );
+  stream.on("error", function (e) {
+    console.error(e);
+    if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
+      console.log("Hello World!");
+      redo();
+    }
+    // An error has occurred and the stream has been closed.
+  });
+  stream.on("status", function (status) {
+    console.log(`[Parser e] ${status}`);
+    // process status
+  });
 }

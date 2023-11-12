@@ -8,17 +8,41 @@ dependencies:
   '@aptos-labs/aptos-processor-sdk':
     specifier: '=0.2.0'
     version: 0.2.0(pg@8.11.3)(ts-node@10.9.1)
+  '@aptos-labs/aptos-protos':
+    specifier: ^1.1.2
+    version: 1.1.2
+  '@grpc/grpc-js':
+    specifier: '=1.9.2'
+    version: 1.9.2
   commander:
     specifier: ^11.0.0
     version: 11.0.0
+  google-protobuf:
+    specifier: ^3.21.2
+    version: 3.21.2
   pg:
     specifier: ^8.11.3
     version: 8.11.3
+  pg-connection-string:
+    specifier: ^2.6.2
+    version: 2.6.2
+  timer-node:
+    specifier: ^5.0.7
+    version: 5.0.7
   typeorm:
     specifier: '=0.3.17'
     version: 0.3.17(pg@8.11.3)(ts-node@10.9.1)
+  typeorm-naming-strategies:
+    specifier: ^4.1.0
+    version: 4.1.0(typeorm@0.3.17)
 
 devDependencies:
+  '@types/google-protobuf':
+    specifier: ^3.15.6
+    version: 3.15.10
+  '@types/js-yaml':
+    specifier: ^4.0.5
+    version: 4.0.9
   '@types/node':
     specifier: ^18.17.13
     version: 18.17.13
@@ -273,6 +297,14 @@ packages:
 
   /@tsconfig/node16@1.0.4:
     resolution: {integrity: sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==}
+
+  /@types/google-protobuf@3.15.10:
+    resolution: {integrity: sha512-uiyKJCa8hbmPE4yxwjbkMOALaBAiOVcatW/yEGbjTqwAh4kzNgQPWRlJMNPXpB5CPUM66xsYufiSX9WKHZCE9g==}
+    dev: true
+
+  /@types/js-yaml@4.0.9:
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+    dev: true
 
   /@types/json-schema@7.0.12:
     resolution: {integrity: sha512-Hr5Jfhc9eYOQNPYO5WLDq/n4jqijdHNlDXjuAQkkt+mWdQR+XJToOHrsD4cPaMXpn6KO7y2+wM8AZEs8VpBLVA==}
