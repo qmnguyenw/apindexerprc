@@ -206,13 +206,12 @@ export class Worker {
     );
 
     stream.on("error", function (e) {
-      console.error("Hello " + e);
-      stream.resume();
+      console.error(e);
       // An error has occurred and the stream has been closed.
     });
 
     stream.on("status", function (status) {
-      console.log(`[Parser e] ${status}`);
+      console.log(`[Parser] ${status}`);
       // process status
     });
   }

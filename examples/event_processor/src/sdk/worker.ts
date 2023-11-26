@@ -2,7 +2,7 @@ import { aptos } from "@aptos-labs/aptos-protos";
 import { Config } from "./config";
 import { Timer } from "timer-node";
 import { exit } from "process";
-import { ChannelCredentials, Metadata } from "@grpc/grpc-js";
+import { ChannelCredentials, Metadata, StatusObject } from "@grpc/grpc-js";
 import { parse as pgConnParse } from "pg-connection-string";
 import { createDataSource } from "./models/data_source";
 import {
@@ -12,6 +12,8 @@ import {
 import { Base } from "./models/base";
 import { TransactionsProcessor } from "./processor";
 import { DataSource } from "typeorm";
+import { readFileSync, writeFileSync } from "fs";
+import { join } from "path";
 
 /**
  * This worker class is responsible for connecting to the txn stream and dispatching
@@ -36,7 +38,7 @@ export class Worker {
     config: Config;
     processor: TransactionsProcessor;
     // Additional models for which we want to create tables in the DB.
-    models: typeof Base[];
+    models: (typeof Base)[];
   }) {
     const options = pgConnParse(config.db_connection_uri);
     const port = options.port || "5432";
@@ -70,7 +72,22 @@ export class Worker {
    */
   async run({ perf }: { perf?: number } = {}) {
     await this.dataSource.initialize();
+    const currentTxnVersion = BigInt(this.config.starting_version || 0n);
+    let next_ver = await this.dataSource
+          .getRepository(NextVersionToProcess)
+          .find();
+    if (next_ver && next_ver.length > 0) {
+        console.log(next_ver[0].nextVersion);
+        await this.startTransactionStream(
+            BigInt(next_ver[0].nextVersion),
+            perf,
+        );
+    } else {
+        await this.startTransactionStream(currentTxnVersion, perf);
+    }
+  }
 
+  async startTransactionStream(startingVersion: bigint, perf?: number) {
     // Create the grpc client.
     const client = new aptos.indexer.v1.RawDataClient(
       this.config.grpc_data_stream_endpoint,
@@ -94,7 +111,7 @@ export class Worker {
       },
     );
 
-    const startingVersion = BigInt(this.config.starting_version || 0n);
+    let currentTxnVersion = startingVersion;
 
     console.log(
       `[Parser] Requesting stream starting from version ${startingVersion}`,
@@ -109,9 +126,6 @@ export class Worker {
       "Authorization",
       `Bearer ${this.config.grpc_data_stream_api_key}`,
     );
-
-    // Create and start the streaming RPC.
-    let currentTxnVersion = startingVersion;
     const stream = client.getTransactions(request, metadata);
 
     const timer = new Timer();
@@ -149,6 +163,8 @@ export class Worker {
           );
         }
 
+        // this.syncWriteFile("response.json", JSON.stringify(aptos.indexer.v1.TransactionsResponse.toJSON(response)));
+
         // Pass the transactions to the given TransactionProcessor. It is responsible
         // for doing its own DB mutations.
         const processingResult = await this.processor.processTransactions({
@@ -165,6 +181,7 @@ export class Worker {
 
         if (numProcessed) {
           await this.dataSource.transaction(async (txnManager) => {
+            console.log("numProcessed");
             const nextVersionToProcess = createNextVersionToProcess({
               indexerName: this.processor.name(),
               version: currentTxnVersion + 1n,
@@ -177,6 +194,7 @@ export class Worker {
           });
         } else if (currentTxnVersion % 1000n === 0n) {
           // Checkpoint
+          console.log("Checkpoint");
           const nextVersionToProcess = createNextVersionToProcess({
             indexerName: this.processor.name(),
             version: currentTxnVersion + 1n,
@@ -206,74 +224,76 @@ export class Worker {
       },
     );
 
-    stream.on("error", function (e) {
-      console.error(e + startingVersion.toString());
-      if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
-        console.log("Hello World!");
-        redo();
+    stream.on("error", async (e) => {
+      console.error(e);
+      this.syncWriteFile("error.txt", e);
+      if (e.message.includes("duplicate key value violates unique constraint")) {
+          let next_ver = await this.dataSource
+              .getRepository(NextVersionToProcess)
+              .find();
+          console.log(next_ver[0].nextVersion);
+          await this.startTransactionStream(
+              BigInt(next_ver[0].nextVersion),
+              perf,
+          );
+      } else {
+          let next_ver = await this.dataSource
+              .getRepository(NextVersionToProcess)
+              .find();
+          console.log(next_ver[0].nextVersion);
+          await this.startTransactionStream(
+              BigInt(next_ver[0].nextVersion),
+              perf,
+          );
       }
-      // An error has occurred and the stream has been closed.
+
+      // if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
+      //   console.log("error 13. retrying streaming");
+      //   let next_ver = await this.dataSource
+      //     .getRepository(NextVersionToProcess)
+      //     .find();
+      //   console.log(next_ver[0].nextVersion);
+      //   await this.startTransactionStream(
+      //     BigInt(next_ver[0].nextVersion),
+      //     perf,
+      //   );
+      // } else if (
+      //   e.message.includes("duplicate key value violates unique constraint")
+      // ) {
+      //   console.log("sql duplicate key value error: ", e.message);
+      //   let next_ver = await this.dataSource
+      //     .getRepository(NextVersionToProcess)
+      //     .find();
+      //   console.log(next_ver[0].nextVersion);
+      //   await this.startTransactionStream(
+      //     BigInt(next_ver[0].nextVersion),
+      //     perf,
+      //   );
+      // }
+      // // An error has occurred and the stream has been closed.
+      // console.error(e);
     });
 
-    stream.on("status", function (status) {
-      console.log(`[Parser e] ${status}`);
+    stream.on("status", function (status: StatusObject) {
+      console.log(`[Parser] ${status}`);
       // process status
     });
   }
-}
 
-function redo() {
-  const client = new aptos.indexer.v1.RawDataClient(
-    "grpc.testnet.aptoslabs.com:443",
-    ChannelCredentials.createSsl(),
-    {
-      "grpc.keepalive_time_ms": 1000,
-      // 0 - No compression
-      // 1 - Compress with DEFLATE algorithm
-      // 2 - Compress with GZIP algorithm
-      // 3 - Stream compression with GZIP algorithm
-      "grpc.default_compression_algorithm": 2,
-      // 0 - No compression
-      // 1 - Low compression level
-      // 2 - Medium compression level
-      // 3 - High compression level
-      "grpc.default_compression_level": 3,
-      // -1 means unlimited
-      "grpc.max_receive_message_length": -1,
-      // -1 means unlimited
-      "grpc.max_send_message_length": -1,
-    },
-  );
-  const startingVersion = BigInt(0n);
-  const request: aptos.indexer.v1.GetTransactionsRequest = {
-    startingVersion,
-  };
+  // write to file SYNCHRONOUSLY
+  syncWriteFile(filename: string, data: any) {
+    /**
+     * flags:
+     *  - w = Open file for reading and writing. File is created if not exists
+     *  - a+ = Open file for reading and appending. The file is created if not exists
+     */
+    writeFileSync(join(__dirname, filename), data, {
+      flag: "w",
+    });
 
-  const metadata = new Metadata();
-  metadata.set(
-    "Authorization",
-    "Bearer EWnPN5ZMFJoaAWAgirCTMteoNNH2lZoznjGM9P3VYhmLHoAUxF4A83rIfqmTpAIQ",
-  );
-
-  // Create and start the streaming RPC.
-  const stream = client.getTransactions(request, metadata);
-  stream.on(
-    "data",
-    async (response: aptos.indexer.v1.TransactionsResponse) => {
-      console.log("hi");
-      console.log(response);
-    }
-  );
-  stream.on("error", function (e) {
-    console.error(e);
-    if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
-      console.log("Hello World!");
-      redo();
-    }
-    // An error has occurred and the stream has been closed.
-  });
-  stream.on("status", function (status) {
-    console.log(`[Parser e] ${status}`);
-    // process status
-  });
+    const contents = readFileSync(join(__dirname, filename), "utf-8");
+    // console.log(contents);
+    // console.log(__dirname + filename);
+    return contents;
+  }
 }

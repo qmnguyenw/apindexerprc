@@ -13,12 +13,13 @@ pnpm install
 
 Prepare the `config.yaml` file. Make sure to update the `config.yaml` file with the correct indexer setting and database credentials.
 ```
-$ cp config.yaml.example ~/config.yaml
+$ cp config.yaml.example config.yaml
 ```
 
 Run the example:
 ```
-pnpm start process --config ~/config.yaml
+cd typescript/examples/event_processor/
+pnpm start process --config config.yaml
 ```
 
 ## Explanation
@@ -38,3 +39,44 @@ The SDK handles the rest:
 - Storing the data from your `parse` function in the database.
 
 In `parser.ts`, we have implemented a `parse` function which accepts a `Transaction` as a parameter. The example code shows how to implement custom filtering and how to extract `Events` from a `Transaction`. The function returns a list of event objects that the SDK will add to the database for us.
+
+
+
+
+Create DB schema for proposal
+
+proposal_id
+proposal_hash
+proposal_name
+proposal_type
+proposal_abstract
+proposal_motivation
+proposal_details
+source_code
+discussion
+no_step
+proposer
+created_at
+proposal_status
+number_yes
+number_no
+min_vote_threshold
+early_resolution_vote_threshold
+
+Create DB schema for vote_events
+proposal_id
+num_votes
+type
+
+early_resolution_vote_threshold
+proposal_hash: execution_hash
+expiration_secs
+metadata: SimpleMap<String, vector<u8>>
+min_vote_threshold
+
+hosting_account: proposer
+proposal_type_info
+
+yes_votes
+no_votes
+resolved_early

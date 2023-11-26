@@ -69,7 +69,7 @@ export class EventProcessor extends TransactionsProcessor {
       const chunkSize = 100;
       for (let i = 0; i < allObjects.length; i += chunkSize) {
         const chunk = allObjects.slice(i, i + chunkSize);
-        await txnManager.insert(Event, chunk);
+        await txnManager.save(Event, chunk);
       }
       return {
         startVersion,

@@ -10,7 +10,8 @@
   "scripts": {
     "start": "ts-node ./src/index.ts",
     "lint": "eslint '**/*.{ts,tsx}'",
-    "fmt": "prettier --write '**/*.(ts|tsx)'"
+    "fmt": "prettier --write '**/*.(ts|tsx)'",
+    "dev": "pnpm start process --config config.yaml"
   },
   "dependencies": {
     "@aptos-labs/aptos-processor-sdk": "=0.2.0",
