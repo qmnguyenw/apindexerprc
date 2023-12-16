@@ -44,8 +44,11 @@ export class EventProcessor extends TransactionsProcessor {
 
       const events = userTransaction.events!;
 
-      // parse events
-      const objects = events.map((event, i) => {
+      const objects = events.filter(
+        // (event: any) => event.typeStr!.includes("0x1::aptos_governance")
+        (event: any) => event.typeStr!.includes("0x1::voting")
+      )
+      .map((event, i) => {
         const eventEntity = new Event();
         eventEntity.transactionVersion = transactionVersion.toString();
         eventEntity.eventIndex = i.toString();
@@ -69,7 +72,7 @@ export class EventProcessor extends TransactionsProcessor {
       const chunkSize = 100;
       for (let i = 0; i < allObjects.length; i += chunkSize) {
         const chunk = allObjects.slice(i, i + chunkSize);
-        await txnManager.save(Event, chunk);
+        await txnManager.insert(Event, chunk);
       }
       return {
         startVersion,

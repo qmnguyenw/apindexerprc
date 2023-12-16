@@ -74,16 +74,13 @@ export class Worker {
     await this.dataSource.initialize();
     const currentTxnVersion = BigInt(this.config.starting_version || 0n);
     let next_ver = await this.dataSource
-          .getRepository(NextVersionToProcess)
-          .find();
+      .getRepository(NextVersionToProcess)
+      .find();
     if (next_ver && next_ver.length > 0) {
-        console.log(next_ver[0].nextVersion);
-        await this.startTransactionStream(
-            BigInt(next_ver[0].nextVersion),
-            perf,
-        );
+      console.log(next_ver[0].nextVersion);
+      await this.startTransactionStream(BigInt(next_ver[0].nextVersion), perf);
     } else {
-        await this.startTransactionStream(currentTxnVersion, perf);
+      await this.startTransactionStream(currentTxnVersion, perf);
     }
   }
 
@@ -226,55 +223,40 @@ export class Worker {
 
     stream.on("error", async (e) => {
       console.error(e);
-      this.syncWriteFile("error.txt", e);
-      if (e.message.includes("duplicate key value violates unique constraint")) {
-          let next_ver = await this.dataSource
-              .getRepository(NextVersionToProcess)
-              .find();
-          console.log(next_ver[0].nextVersion);
-          await this.startTransactionStream(
-              BigInt(next_ver[0].nextVersion),
-              perf,
-          );
+      this.syncWriteFile("error.txt", e.message);
+      if (
+        e.message.includes(
+          "8 RESOURCE_EXHAUSTED: Bandwidth exhausted or memory limit exceeded",
+        )
+      ) {
+        const nextVersionToProcess = createNextVersionToProcess({
+          indexerName: this.processor.name(),
+          version: currentTxnVersion + 1000n,
+        });
+        let next_ver = await this.dataSource
+          .getRepository(NextVersionToProcess)
+          .find();
+        console.log(next_ver[0].nextVersion);
+        await this.dataSource
+          .getRepository(NextVersionToProcess)
+          .upsert(nextVersionToProcess, ["indexerName"]);
+        await this.startTransactionStream(
+          BigInt(next_ver[0].nextVersion),
+          perf,
+        );
       } else {
-          let next_ver = await this.dataSource
-              .getRepository(NextVersionToProcess)
-              .find();
-          console.log(next_ver[0].nextVersion);
-          await this.startTransactionStream(
-              BigInt(next_ver[0].nextVersion),
-              perf,
-          );
+        let next_ver = await this.dataSource
+          .getRepository(NextVersionToProcess)
+          .find();
+        console.log(next_ver[0].nextVersion);
+        await this.startTransactionStream(
+          BigInt(next_ver[0].nextVersion),
+          perf,
+        );
       }
-
-      // if (e.message.trim() === "13 INTERNAL: Received RST_STREAM with code 0") {
-      //   console.log("error 13. retrying streaming");
-      //   let next_ver = await this.dataSource
-      //     .getRepository(NextVersionToProcess)
-      //     .find();
-      //   console.log(next_ver[0].nextVersion);
-      //   await this.startTransactionStream(
-      //     BigInt(next_ver[0].nextVersion),
-      //     perf,
-      //   );
-      // } else if (
-      //   e.message.includes("duplicate key value violates unique constraint")
-      // ) {
-      //   console.log("sql duplicate key value error: ", e.message);
-      //   let next_ver = await this.dataSource
-      //     .getRepository(NextVersionToProcess)
-      //     .find();
-      //   console.log(next_ver[0].nextVersion);
-      //   await this.startTransactionStream(
-      //     BigInt(next_ver[0].nextVersion),
-      //     perf,
-      //   );
-      // }
-      // // An error has occurred and the stream has been closed.
-      // console.error(e);
     });
 
-    stream.on("status", function (status: StatusObject) {
+    stream.on("status", function (status) {
       console.log(`[Parser] ${status}`);
       // process status
     });
